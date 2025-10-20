@@ -8,8 +8,11 @@ export async function sendDailyReport() {
   try {
     console.log("📊 Generating daily report...");
 
+    // ✅ FIX: Paksa pakai WIB
     const now = new Date();
-    const today = now.toISOString().split("T")[0];
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const nowWIB = new Date(now.getTime() + wibOffset);
+    const today = nowWIB.toISOString().split("T")[0];
 
     // Ambil semua camera dengan status problematic
     const offlineCameras = await prisma.camera.findMany({
@@ -29,7 +32,7 @@ export async function sendDailyReport() {
     // Format message untuk daily report
     let message = `📋 *LAPORAN HARIAN CCTV* \n`;
     message += `Tanggal: ${today}\n`;
-    message += `Waktu: ${now.toLocaleTimeString("id-ID")}\n`;
+    message += `Waktu: ${nowWIB.toLocaleTimeString("id-ID")}\n`;
     message += `\n📊 *STATISTIK:*\n`;
     message += `✅ Online: ${onlineCameras}\n`;
     message += `🔴 Offline: ${offlineCameras.length}\n`;
@@ -42,7 +45,9 @@ export async function sendDailyReport() {
     } else {
       offlineCameras.forEach((cam, index) => {
         const lastOnline = cam.lastOnline
-          ? new Date(cam.lastOnline).toLocaleString("id-ID")
+          ? new Date(cam.lastOnline).toLocaleString("id-ID", {
+              timeZone: "Asia/Jakarta",
+            })
           : "Tidak pernah online";
         message += `${index + 1}. ${cam.name} (${
           cam.ip
@@ -57,16 +62,17 @@ export async function sendDailyReport() {
       dateErrorCameras.forEach((cam, index) => {
         message += `${index + 1}. ${cam.name} (${cam.ip})\n   Tanggal Kamera: ${
           cam.cameraDate
-        }\n   Seharusnya: ${today}\n`; // ✅ Pakai variable `today` dari luar
+        }\n   Seharusnya: ${today}\n`;
       });
     }
 
-    message += `\n⏰ *Update Terakhir:* ${now.toLocaleString("id-ID")}`;
+    message += `\n⏰ *Update Terakhir:* ${nowWIB.toLocaleString("id-ID")}`;
 
     // Kirim via WhatsApp
     const groupId = process.env.WHATSAPP_GROUP_ID;
     if (groupId) {
       await sendWhatsAppMessage(groupId, message);
+      console.log("📱 Daily report sent successfully");
     } else {
       console.log("❌ WhatsApp group ID not configured");
     }
@@ -86,7 +92,6 @@ export async function sendDailyReport() {
   }
 }
 
-// Function untuk manual trigger
 export async function manualDailyReport() {
   return await sendDailyReport();
 }

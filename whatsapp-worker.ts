@@ -2,6 +2,7 @@ import { Client, LocalAuth } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import express from "express";
 import cron from "node-cron";
+import { PrismaClient } from "@prisma/client";
 
 let waClient: Client | null = null;
 let isReady = false;
@@ -150,8 +151,6 @@ async function start() {
 }
 
 async function scheduleDailyReport() {
-  // Cron: setiap hari jam 8:00 WIB
-  // Format: menit jam hari bulan hari-dalam-minggu
   cron.schedule(
     "0 8 * * *",
     async () => {
@@ -159,6 +158,12 @@ async function scheduleDailyReport() {
 
       try {
         const prisma = new PrismaClient();
+
+        // ✅ FIX: Paksa pakai WIB
+        const now = new Date();
+        const wibOffset = 7 * 60 * 60 * 1000;
+        const nowWIB = new Date(now.getTime() + wibOffset);
+        const today = nowWIB.toISOString().split("T")[0];
 
         const offlineCameras = await prisma.camera.findMany({
           where: { status: "offline" },
@@ -174,12 +179,9 @@ async function scheduleDailyReport() {
         const onlineCameras =
           totalCameras - offlineCameras.length - dateErrorCameras.length;
 
-        const now = new Date();
-        const today = now.toISOString().split("T")[0];
-
         let message = `📋 *LAPORAN HARIAN CCTV* \n`;
         message += `Tanggal: ${today}\n`;
-        message += `Waktu: ${now.toLocaleTimeString("id-ID")}\n`;
+        message += `Waktu: ${nowWIB.toLocaleTimeString("id-ID")}\n`;
         message += `\n📊 *STATISTIK:*\n`;
         message += `✅ Online: ${onlineCameras}\n`;
         message += `🔴 Offline: ${offlineCameras.length}\n`;
@@ -192,7 +194,9 @@ async function scheduleDailyReport() {
         } else {
           offlineCameras.forEach((cam, index) => {
             const lastOnline = cam.lastOnline
-              ? new Date(cam.lastOnline).toLocaleString("id-ID")
+              ? new Date(cam.lastOnline).toLocaleString("id-ID", {
+                  timeZone: "Asia/Jakarta",
+                })
               : "Tidak pernah online";
             message += `${index + 1}. ${cam.name} (${
               cam.ip
@@ -209,11 +213,11 @@ async function scheduleDailyReport() {
               cam.ip
             })\n   Tanggal Kamera: ${
               cam.cameraDate
-            }\n   Seharusnya: ${today}\n`; // ✅ Pakai `today` dari atas
+            }\n   Seharusnya: ${today}\n`;
           });
         }
 
-        message += `\n⏰ *Update Terakhir:* ${now.toLocaleString("id-ID")}`;
+        message += `\n⏰ *Update Terakhir:* ${nowWIB.toLocaleString("id-ID")}`;
 
         const groupId = process.env.WHATSAPP_GROUP_ID;
         if (groupId && waClient && isReady) {
@@ -227,7 +231,7 @@ async function scheduleDailyReport() {
       }
     },
     {
-      timezone: "Asia/Jakarta", // ✅ Set timezone WIB
+      timezone: "Asia/Jakarta",
     }
   );
 
