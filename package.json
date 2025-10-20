@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "concurrently \"node server.js\" \"pnpm run dev:wa\"",
+    "dev:wa": "tsx wa-worker.ts",
+    "dev1": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "node server.js",
     "start1": "next start"
@@ -40,6 +42,7 @@
     "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "prisma": "^6.17.1",
     "tailwindcss": "^4",
     "typescript": "^5"
