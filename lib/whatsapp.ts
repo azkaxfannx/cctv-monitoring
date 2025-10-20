@@ -8,15 +8,13 @@ export async function initWhatsApp() {
 
   waClient = new Client({
     authStrategy: new LocalAuth(),
-    webVersionCache: {
-      type: "remote",
-      remotePath:
-        "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
-    },
+    // webVersionCache: {
+    //   type: "none", // 👈 ini yang penting
+    // },
     puppeteer: {
       headless: true,
       executablePath:
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", // sesuaikan path Chrome-mu
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -33,9 +31,8 @@ export async function initWhatsApp() {
     console.log("📱 Scan QR Code di bawah ini untuk login WhatsApp:");
     qrcode.generate(qr, { small: true });
   });
-
   waClient.on("authenticated", () => {
-    console.log("🔒 WhatsApp Authenticated!");
+    console.log("🔐 WhatsApp Authenticated!");
   });
 
   waClient.on("ready", () => {
@@ -48,7 +45,6 @@ export async function initWhatsApp() {
 
   waClient.on("disconnected", (reason) => {
     console.log("❌ WhatsApp disconnected:", reason);
-    waClient = null; // Reset client
   });
 
   await waClient.initialize();
