@@ -152,7 +152,7 @@ async function start() {
 
 async function scheduleDailyReport() {
   cron.schedule(
-    "48 1 * * *",
+    "0 2 * * *",
     async () => {
       console.log("⏰ [CRON] Running daily report at 8:00 AM WIB");
 
@@ -218,7 +218,7 @@ async function scheduleDailyReport() {
           });
         }
 
-        message += `\n⏰ *Update Terakhir:* ${nowWIB.toLocaleString("id-ID")}`;
+        // message += `\n⏰ *Update Terakhir:* ${nowWIB.toLocaleString("id-ID")}`;
 
         const groupId = process.env.WHATSAPP_GROUP_ID;
         if (groupId && waClient && isReady) {
