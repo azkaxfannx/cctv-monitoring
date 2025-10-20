@@ -268,18 +268,18 @@ function extractDateGeneric(data: any): string | null {
 export async function monitorCamera(camera: any) {
   const today = new Date().toISOString().split("T")[0];
 
-  console.log(`\n[MONITOR START] Camera: ${camera.name} (${camera.ip})`);
-  console.log(`[MONITOR DEBUG] Username from DB: "${camera.username}"`);
   console.log(
-    `[MONITOR DEBUG] Password from DB: "${
-      camera.password ? "***SET***" : "NOT SET"
-    }"`
+    `\n[${camera.id}] [MONITOR START] Camera: ${camera.name} (${camera.ip})`
   );
+  console.log(
+    `[${camera.id}] [MONITOR DEBUG] Current status: ${camera.status}`
+  );
+  console.log(`[${camera.id}] [MONITOR DEBUG] Username: "${camera.username}"`);
 
   try {
     // 1. PING CHECK
     const isOnline = await pingCamera(camera.ip);
-    console.log(`[MONITOR DEBUG] Ping result: ${isOnline}`);
+    console.log(`[${camera.id}] [MONITOR DEBUG] Ping result: ${isOnline}`);
 
     let newStatus = "offline";
     let cameraDate = null;
@@ -291,22 +291,29 @@ export async function monitorCamera(camera: any) {
       const username = camera.username ? String(camera.username) : undefined;
       const password = camera.password ? String(camera.password) : undefined;
 
-      console.log(`[MONITOR DEBUG] Starting date scrape...`);
+      console.log(`[${camera.id}] [MONITOR DEBUG] Starting date scrape...`);
       cameraDate = await scrapeCameraDate(camera.ip, username, password);
 
       if (cameraDate && cameraDate !== today) {
         newStatus = "date_error";
-        console.log(`[DATE ERROR] Expected: ${today}, Got: ${cameraDate}`);
+        console.log(
+          `[${camera.id}] [DATE ERROR] Expected: ${today}, Got: ${cameraDate}`
+        );
       } else if (cameraDate === today) {
-        console.log(`[DATE OK] ${cameraDate}`);
+        console.log(`[${camera.id}] [DATE OK] ${cameraDate}`);
       } else {
-        console.log(`[DATE DEBUG] No date found or date is null`);
+        console.log(
+          `[${camera.id}] [DATE DEBUG] No date found or date is null`
+        );
       }
     }
 
     const statusChanged = camera.status !== newStatus;
+    console.log(
+      `[${camera.id}] [STATUS CHANGE] ${camera.status} -> ${newStatus}, Changed: ${statusChanged}`
+    );
 
-    // 3. UPDATE DATABASE (selalu update status terbaru)
+    // 3. UPDATE DATABASE
     await prisma.camera.update({
       where: { id: camera.id },
       data: {
@@ -317,7 +324,7 @@ export async function monitorCamera(camera: any) {
       },
     });
 
-    // 4. SMART LOGGING - hanya log ketika diperlukan
+    // 4. SMART LOGGING
     const loggingResult = await smartStatusLogging(
       camera.id,
       newStatus,
@@ -326,7 +333,7 @@ export async function monitorCamera(camera: any) {
 
     if (loggingResult.shouldLog) {
       console.log(
-        `[SMART LOG] Creating log for ${camera.name}: ${loggingResult.eventType}`
+        `[${camera.id}] [SMART LOG] Creating log: ${loggingResult.eventType}`
       );
 
       await createStatusLog(
@@ -336,14 +343,10 @@ export async function monitorCamera(camera: any) {
           ? `Camera date: ${cameraDate}, Expected: ${today}`
           : `Status: ${newStatus}`
       );
-    } else {
-      console.log(
-        `[SMART LOG] Skipping log for ${camera.name} (consecutive: ${loggingResult.eventType})`
-      );
     }
 
     console.log(
-      `[MONITOR END] ${camera.name} -> Status: ${newStatus}, Changed: ${statusChanged}, Logged: ${loggingResult.shouldLog}\n`
+      `[${camera.id}] [MONITOR END] Status: ${newStatus}, Changed: ${statusChanged}, Logged: ${loggingResult.shouldLog}\n`
     );
 
     return {
@@ -354,7 +357,7 @@ export async function monitorCamera(camera: any) {
       eventType: loggingResult.eventType,
     };
   } catch (error) {
-    console.error(`[MONITOR ERROR] ${camera.name}:`, error);
+    console.error(`[${camera.id}] [MONITOR ERROR]:`, error);
 
     // Untuk error, selalu log
     await createStatusLog(
@@ -365,7 +368,6 @@ export async function monitorCamera(camera: any) {
       }`
     );
 
-    // Update status ke error
     await prisma.camera.update({
       where: { id: camera.id },
       data: {
@@ -387,9 +389,9 @@ export async function monitorCamera(camera: any) {
 export async function monitorCameraWithSocket(camera: any) {
   const result = await monitorCamera(camera);
 
-  // Kirim update via WebSocket jika status berubah
+  // Kirim update via WebSocket ke room camera specific
   if (result.statusChanged && (global as any).io) {
-    (global as any).io.emit("camera_status_change", {
+    (global as any).io.emitToCamera(camera.id, "camera_status_change", {
       id: camera.id,
       name: camera.name,
       ip: camera.ip,

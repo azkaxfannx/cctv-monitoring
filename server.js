@@ -10,9 +10,6 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-// Simpan connected clients
-const connectedClients = new Map();
-
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
@@ -36,12 +33,6 @@ app.prepare().then(() => {
 
   io.on("connection", (socket) => {
     console.log("✅ Client connected:", socket.id);
-    connectedClients.set(socket.id, socket);
-
-    socket.on("disconnect", () => {
-      console.log("❌ Client disconnected:", socket.id);
-      connectedClients.delete(socket.id);
-    });
 
     // Join room untuk camera updates
     socket.on("join_camera_updates", (cameraId) => {
@@ -54,17 +45,27 @@ app.prepare().then(() => {
       socket.leave(`camera:${cameraId}`);
       console.log(`📡 Client ${socket.id} left camera:${cameraId}`);
     });
+
+    socket.on("disconnect", () => {
+      console.log("❌ Client disconnected:", socket.id);
+    });
   });
 
   // Simpan io instance untuk akses global dengan function yang lebih baik
   global.io = {
-    emit: (event, data) => {
-      io.emit(event, data);
-    },
+    // Emit to specific camera room
     emitToCamera: (cameraId, event, data) => {
       io.to(`camera:${cameraId}`).emit(event, data);
+      console.log(
+        `📡 WebSocket sent to camera:${cameraId} - ${event}:`,
+        data.status
+      );
     },
-    getConnectedCount: () => connectedClients.size,
+    // Emit to all clients (for general updates)
+    emitToAll: (event, data) => {
+      io.emit(event, data);
+    },
+    getConnectedCount: () => io.engine.clientsCount,
   };
 
   server

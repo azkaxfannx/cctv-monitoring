@@ -36,12 +36,6 @@ export default function Dashboard() {
   const socketRef = useRef<Socket | null>(null);
   const selectedCameraRef = useRef<Camera | null>(null);
 
-  // Update ref ketika selectedCamera berubah
-  useEffect(() => {
-    selectedCameraRef.current = selectedCamera;
-  }, [selectedCamera]);
-
-  // WebSocket setup - HANYA SEKALI
   useEffect(() => {
     console.log("🔄 Setting up WebSocket...");
 
@@ -60,8 +54,10 @@ export default function Dashboard() {
     newSocket.on("connect", () => {
       console.log("✅ WebSocket Connected:", newSocket.id);
 
+      // Join camera room jika ada selected camera
       if (selectedCamera) {
         newSocket.emit("join_camera_updates", selectedCamera.id);
+        console.log(`📡 Joined camera room: ${selectedCamera.id}`);
       }
     });
 
@@ -74,16 +70,24 @@ export default function Dashboard() {
     });
 
     newSocket.on("camera_status_change", (updatedCamera) => {
-      console.log("📡 WebSocket update received:", updatedCamera);
+      console.log(
+        "📡 WebSocket update received for camera:",
+        updatedCamera.id,
+        updatedCamera.status
+      );
 
+      // Pastikan update hanya untuk camera yang benar
       setCameras((prev) =>
         prev.map((cam) =>
           cam.id === updatedCamera.id ? { ...cam, ...updatedCamera } : cam
         )
       );
 
-      // Gunakan ref untuk hindari dependency
+      // Update selected camera hanya jika ID-nya match
       if (selectedCameraRef.current?.id === updatedCamera.id) {
+        console.log(
+          `📡 Updating selected camera: ${updatedCamera.name} -> ${updatedCamera.status}`
+        );
         setSelectedCamera((prev) =>
           prev ? { ...prev, ...updatedCamera } : null
         );
@@ -100,9 +104,22 @@ export default function Dashboard() {
     };
   }, []); // Empty dependency - HANYA SEKALAI
 
+  // Handle selected camera changes untuk join/leave room
   useEffect(() => {
-    if (socketRef.current && selectedCamera) {
-      socketRef.current.emit("join_camera_updates", selectedCamera.id);
+    if (!socketRef.current) return;
+
+    const socket = socketRef.current;
+
+    if (selectedCamera) {
+      // Join room untuk camera yang dipilih
+      socket.emit("join_camera_updates", selectedCamera.id);
+      console.log(`📡 Joined camera room: ${selectedCamera.id}`);
+
+      // Leave other rooms? atau biarkan multiple rooms?
+    } else {
+      // Leave semua camera rooms ketika tidak ada selected camera
+      // Atau biarkan saja, tidak perlu leave
+      console.log("📡 No camera selected");
     }
   }, [selectedCamera]);
 
