@@ -1,9 +1,24 @@
 // lib/get-group-id.ts
 import { Client, LocalAuth } from "whatsapp-web.js";
+import puppeteer from "puppeteer";
 
 export async function getGroupIds() {
   const client = new Client({
     authStrategy: new LocalAuth(),
+    puppeteer: {
+      headless: true, // jalankan Chromium tanpa GUI
+      executablePath: puppeteer.executablePath(), // pakai Chromium bawaan Puppeteer
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-gpu",
+      ],
+    },
   });
 
   client.on("qr", (qr) => {
@@ -15,24 +30,19 @@ export async function getGroupIds() {
     console.log("✅ WhatsApp Bot ready!");
 
     try {
-      // Get semua groups
       const chats = await client.getChats();
       const groupChats = chats.filter((chat) => chat.isGroup);
 
       console.log("\n📋 DAFTAR GROUP YANG DITEMUKAN:");
       console.log("=================================");
 
-      // Process setiap group untuk mendapatkan detail lengkap
       for (let i = 0; i < groupChats.length; i++) {
         const group = groupChats[i];
-
-        // Get detail group yang lebih lengkap
         const groupDetail = await client.getChatById(group.id._serialized);
 
         console.log(`${i + 1}. ${group.name}`);
         console.log(`   ID: ${group.id._serialized}`);
 
-        // Cek jika participants ada
         if ("participants" in groupDetail) {
           const participants = (groupDetail as any).participants || [];
           console.log(`   Participants: ${participants.length}`);
@@ -43,7 +53,6 @@ export async function getGroupIds() {
         console.log("---------------------------------");
       }
 
-      // Save ke file untuk referensi
       const groupData = await Promise.all(
         groupChats.map(async (group) => {
           const groupDetail = await client.getChatById(group.id._serialized);
@@ -82,5 +91,4 @@ export async function getGroupIds() {
   await client.initialize();
 }
 
-// Jalankan function ini
 getGroupIds().catch(console.error);
