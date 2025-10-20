@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { smartStatusLogging, createStatusLog } from "./smart-logging";
 import DigestFetch from "digest-fetch";
+import { whatsappAlert } from "./whatsapp";
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();
@@ -500,7 +501,7 @@ export async function monitorCamera(camera: any) {
     );
 
     // 3. UPDATE DATABASE
-    await prisma.camera.update({
+    const updatedCamera = await prisma.camera.update({
       where: { id: camera.id },
       data: {
         status: newStatus,
@@ -529,6 +530,26 @@ export async function monitorCamera(camera: any) {
           ? `Camera date: ${cameraDate}, Expected: ${today}`
           : `Status: ${newStatus}`
       );
+
+      // 📱 KIRIM WHATSAPP ALERT JIKA STATUS BERUBAH
+      if (
+        statusChanged &&
+        (newStatus === "offline" || newStatus === "date_error")
+      ) {
+        console.log(
+          `[${camera.id}] 📱 Sending WhatsApp alert for status change`
+        );
+        try {
+          await whatsappAlert(
+            updatedCamera,
+            newStatus,
+            cameraDate || undefined
+          );
+          console.log(`[${camera.id}] 📱 WhatsApp alert sent successfully`);
+        } catch (waError) {
+          console.error(`[${camera.id}] 📱 WhatsApp alert failed:`, waError);
+        }
+      }
     }
 
     console.log(
