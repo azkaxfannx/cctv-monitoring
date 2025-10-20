@@ -4,7 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { smartStatusLogging, createStatusLog } from "./smart-logging";
 import DigestFetch from "digest-fetch";
-import { whatsappAlert } from "./whatsapp";
+import { whatsappAlert } from "./whatsapp-helper";
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();

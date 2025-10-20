@@ -1,6 +1,6 @@
 // lib/daily-report.ts
 import { PrismaClient } from "@prisma/client";
-import { whatsappAlert, initWhatsApp } from "./whatsapp";
+import { sendWhatsAppMessage } from "./whatsapp-helper";
 
 const prisma = new PrismaClient();
 
@@ -65,12 +65,9 @@ export async function sendDailyReport() {
     message += `\n⏰ *Update Terakhir:* ${now.toLocaleString("id-ID")}`;
 
     // Kirim via WhatsApp
-    const client = await initWhatsApp();
     const groupId = process.env.WHATSAPP_GROUP_ID;
-
     if (groupId) {
-      await client?.sendMessage(groupId, message);
-      console.log("📱 Daily report sent successfully");
+      await sendWhatsAppMessage(groupId, message);
     } else {
       console.log("❌ WhatsApp group ID not configured");
     }
