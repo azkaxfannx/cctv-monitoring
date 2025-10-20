@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"node server.js\" \"pnpm run dev:wa\"",
-    "dev:wa": "tsx wa-worker.ts",
+    "dev:wa": "npx tsx wa-worker.ts",
     "dev1": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "node server.js",
