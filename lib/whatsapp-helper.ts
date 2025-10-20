@@ -70,7 +70,10 @@ export async function whatsappAlert(
         camera.lastOnline?.toLocaleTimeString("id-ID") || "-"
       }`;
     } else if (status === "date_error") {
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const nowWIB = new Date(now.getTime() + wibOffset);
+      const today = nowWIB.toISOString().split("T")[0]; // Tanggal WIB
       message = `🚨 CCTV Alert\n🟡 ${camera.name} (${camera.ip})\nTanggal di kamera: ${cameraDate}\nSeharusnya: ${today}`;
     } else if (status === "online") {
       // ✅ TAMBAHKAN INI

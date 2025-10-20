@@ -445,7 +445,10 @@ function extractDateGeneric(data: any): string | null {
 }
 
 export async function monitorCamera(camera: any) {
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const nowWIB = new Date(now.getTime() + wibOffset);
+  const today = nowWIB.toISOString().split("T")[0]; // Tanggal WIB
 
   console.log(
     `\n[${camera.id}] [MONITOR START] Camera: ${camera.name} (${camera.ip})`
