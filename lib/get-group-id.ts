@@ -9,7 +9,7 @@ export async function getGroupIds() {
       headless: true,
       executablePath:
         executablePath() ||
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
