@@ -45,6 +45,7 @@ export async function scrapeCameraDate(
       // Hikvision endpoints
       "/ISAPI/System/deviceInfo", // Device info API
       "/ISAPI/System/time", // System time API
+      "/ISAPI/Security/userCheck", // Test authentication
       "/doc/page/config.asp", // Web config page
       "/doc/page/preview.asp", // Web preview page
 
@@ -65,6 +66,8 @@ export async function scrapeCameraDate(
       console.log(`[SCRAPE DEBUG] Trying endpoint: ${endpoint}`);
 
       const baseUrl = `http://${ip}`;
+
+      // Config untuk request
       const config: any = {
         timeout: 10000,
         validateStatus: function (status: number) {
@@ -76,11 +79,15 @@ export async function scrapeCameraDate(
           Accept: "*/*",
           "Accept-Language": "en-US,en;q=0.5",
         },
+        // Tambahkan ini untuk handle redirect dan auth
+        maxRedirects: 0, // Jangan ikuti redirect
       };
 
       // Tambahkan authentication jika username & password ada
       if (username && password) {
         console.log(`[SCRAPE DEBUG] Using authentication for ${endpoint}`);
+
+        // Coba Basic Auth dulu
         config.auth = {
           username: username,
           password: password,
@@ -91,9 +98,24 @@ export async function scrapeCameraDate(
         console.log(
           `[SCRAPE DEBUG] Making request to ${baseUrl}${endpoint}...`
         );
-        const response = await axios.get(`${baseUrl}${endpoint}`, config);
+        let response = await axios.get(`${baseUrl}${endpoint}`, config);
 
         console.log(`[SCRAPE DEBUG] ${endpoint} -> Status: ${response.status}`);
+
+        // Handle 401 - Coba dengan Digest Auth
+        if (response.status === 401 && username && password) {
+          console.log(`[SCRAPE DEBUG] 401 received, trying Digest Auth...`);
+
+          // Coba dengan digest auth menggunakan library khusus
+          response = await tryDigestAuth(
+            `${baseUrl}${endpoint}`,
+            username,
+            password
+          );
+          console.log(
+            `[SCRAPE DEBUG] Digest Auth -> Status: ${response.status}`
+          );
+        }
 
         if (response.status === 200) {
           console.log(`[SCRAPE DEBUG] SUCCESS: ${endpoint} returned 200`);
@@ -133,11 +155,19 @@ export async function scrapeCameraDate(
             // Debug content untuk analisis
             if (typeof responseData === "string") {
               console.log(
-                `[SCRAPE DEBUG] First 300 chars: ${responseData.substring(
+                `[SCRAPE DEBUG] First 500 chars: ${responseData.substring(
                   0,
-                  300
+                  500
                 )}`
               );
+
+              // Untuk HTML, cari lebih dalam
+              if (endpoint.includes("/ISAPI/")) {
+                console.log(
+                  `[SCRAPE DEBUG] ISAPI Full response (first 1000 chars):`,
+                  responseData.substring(0, 1000)
+                );
+              }
             }
           }
         } else if (response.status === 401) {
@@ -148,6 +178,8 @@ export async function scrapeCameraDate(
           console.log(`[SCRAPE DEBUG] ❌ Endpoint not found: ${endpoint}`);
         } else if (response.status === 403) {
           console.log(`[SCRAPE DEBUG] ❌ Access forbidden: ${endpoint}`);
+        } else if (response.status === 400) {
+          console.log(`[SCRAPE DEBUG] ❌ Bad request: ${endpoint}`);
         }
       } catch (endpointError: any) {
         console.log(
@@ -163,6 +195,92 @@ export async function scrapeCameraDate(
     return null;
   } finally {
     console.log(`[SCRAPE DEBUG END] ${ip}\n`);
+  }
+}
+
+// Function untuk Digest Authentication
+async function tryDigestAuth(url: string, username: string, password: string) {
+  try {
+    // Gunakan library http-digest-client atau approach manual
+    const { default: digestAuth } = await import("http-digest-client");
+
+    const client = digestAuth(username, password);
+    return await client.get(url);
+  } catch (error) {
+    console.log(`[DIGEST AUTH] Error:`, error);
+
+    // Fallback: coba dengan approach manual
+    return await manualDigestAuth(url, username, password);
+  }
+}
+
+// Manual Digest Auth implementation
+async function manualDigestAuth(
+  url: string,
+  username: string,
+  password: string
+) {
+  try {
+    // Step 1: Get authentication challenge
+    const challengeResponse = await axios.get(url, {
+      validateStatus: () => true,
+    });
+
+    if (challengeResponse.status !== 401) {
+      return challengeResponse;
+    }
+
+    const authHeader = challengeResponse.headers["www-authenticate"];
+    console.log(`[DIGEST AUTH] Challenge: ${authHeader}`);
+
+    // Parse digest challenge (sederhana)
+    // Untuk implementasi lengkap, butuh library seperti 'digest-fetch'
+
+    // Fallback ke approach lain
+    return await tryAlternativeAuthMethods(url, username, password);
+  } catch (error) {
+    console.log(`[MANUAL DIGEST AUTH] Error:`, error);
+    throw error;
+  }
+}
+
+// Alternative auth methods
+async function tryAlternativeAuthMethods(
+  url: string,
+  username: string,
+  password: string
+) {
+  console.log(`[ALTERNATIVE AUTH] Trying alternative methods...`);
+
+  // Method 1: Coba dengan query parameters (beberapa kamera support)
+  try {
+    const urlWithAuth = url.includes("?")
+      ? `${url}&user=${username}&password=${password}`
+      : `${url}?user=${username}&password=${password}`;
+
+    const response = await axios.get(urlWithAuth);
+    console.log(`[ALTERNATIVE AUTH] Query params method: ${response.status}`);
+    return response;
+  } catch (error) {
+    console.log(`[ALTERNATIVE AUTH] Query params failed`);
+  }
+
+  // Method 2: Coba dengan custom headers
+  try {
+    const credentials = Buffer.from(`${username}:${password}`).toString(
+      "base64"
+    );
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    console.log(`[ALTERNATIVE AUTH] Custom headers method: ${response.status}`);
+    return response;
+  } catch (error) {
+    console.log(`[ALTERNATIVE AUTH] Custom headers failed`);
+    throw error;
   }
 }
 
