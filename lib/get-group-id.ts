@@ -8,8 +8,7 @@ export async function getGroupIds() {
     puppeteer: {
       headless: true,
       executablePath:
-        executablePath() ||
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
