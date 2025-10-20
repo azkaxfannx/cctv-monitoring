@@ -8,6 +8,9 @@ export async function initWhatsApp() {
 
   waClient = new Client({
     authStrategy: new LocalAuth(),
+    webVersionCache: {
+      type: "none", // 👈 ini yang penting
+    },
     puppeteer: {
       headless: true,
       executablePath:
