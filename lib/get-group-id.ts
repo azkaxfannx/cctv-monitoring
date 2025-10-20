@@ -8,7 +8,7 @@ export async function getGroupIds() {
     puppeteer: {
       headless: true,
       executablePath:
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -16,8 +16,11 @@ export async function getGroupIds() {
         "--disable-accelerated-2d-canvas",
         "--no-first-run",
         "--no-zygote",
-        "--single-process",
         "--disable-gpu",
+        "--disable-features=site-per-process",
+        "--disable-web-security",
+        "--ignore-certificate-errors",
+        "--start-maximized",
       ],
     },
   });
