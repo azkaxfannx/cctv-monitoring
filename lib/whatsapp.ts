@@ -8,11 +8,11 @@ export async function initWhatsApp() {
 
   waClient = new Client({
     authStrategy: new LocalAuth(),
-    webVersionCache: {
-      type: "none", // 👈 ini yang penting
-    },
+    // webVersionCache: {
+    //   type: "none", // 👈 ini yang penting
+    // },
     puppeteer: {
-      headless: true,
+      headless: false,
       executablePath:
         "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", // sesuaikan path Chrome-mu
       args: [
