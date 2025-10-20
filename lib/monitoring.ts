@@ -3,6 +3,7 @@ import axios from "axios";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { smartStatusLogging, createStatusLog } from "./smart-logging";
+import DigestFetch from "digest-fetch";
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();
@@ -195,6 +196,65 @@ export async function scrapeCameraDate(
     return null;
   } finally {
     console.log(`[SCRAPE DEBUG END] ${ip}\n`);
+  }
+}
+
+async function tryHikvisionISAPI(
+  ip: string,
+  username: string,
+  password: string
+) {
+  try {
+    console.log(`[HIKVISION ISAPI] Trying with digest-fetch...`);
+
+    const client = new DigestFetch(username, password);
+
+    const endpoints = [
+      "/ISAPI/System/deviceInfo",
+      "/ISAPI/System/time",
+      "/ISAPI/System/status",
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const url = `http://${ip}${endpoint}`;
+        console.log(`[HIKVISION ISAPI] Trying: ${url}`);
+
+        const response = await client.fetch(url);
+        const text = await response.text();
+
+        console.log(
+          `[HIKVISION ISAPI] ${endpoint} -> Status: ${response.status}`
+        );
+
+        if (response.status === 200) {
+          console.log(`[HIKVISION ISAPI] SUCCESS with ${endpoint}`);
+
+          // Extract date dari XML response
+          const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+          if (dateMatch) {
+            console.log(`[HIKVISION ISAPI] Date found: ${dateMatch[1]}`);
+            return dateMatch[1];
+          }
+
+          // Log XML content untuk debugging
+          console.log(
+            `[HIKVISION ISAPI] XML response (first 500 chars):`,
+            text.substring(0, 500)
+          );
+        }
+      } catch (error) {
+        console.log(
+          `[HIKVISION ISAPI] Error with ${endpoint}:`,
+          (error as any).message
+        );
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.log(`[HIKVISION ISAPI] Overall error:`, error);
+    return null;
   }
 }
 
@@ -392,7 +452,6 @@ export async function monitorCamera(camera: any) {
   console.log(
     `[${camera.id}] [MONITOR DEBUG] Current status: ${camera.status}`
   );
-  console.log(`[${camera.id}] [MONITOR DEBUG] Username: "${camera.username}"`);
 
   try {
     // 1. PING CHECK
@@ -410,7 +469,16 @@ export async function monitorCamera(camera: any) {
       const password = camera.password ? String(camera.password) : undefined;
 
       console.log(`[${camera.id}] [MONITOR DEBUG] Starting date scrape...`);
-      cameraDate = await scrapeCameraDate(camera.ip, username, password);
+
+      // Coba method khusus Hikvision terlebih dahulu
+      if (username && password) {
+        cameraDate = await tryHikvisionISAPI(camera.ip, username, password);
+      }
+
+      // Jika method khusus tidak berhasil, coba method umum
+      if (!cameraDate) {
+        cameraDate = await scrapeCameraDate(camera.ip, username, password);
+      }
 
       if (cameraDate && cameraDate !== today) {
         newStatus = "date_error";
