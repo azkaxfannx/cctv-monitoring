@@ -30,13 +30,14 @@
     "socket.io": "4.7.0",
     "socket.io-client": "^4.7.0",
     "tailwind-merge": "2.2.0",
-    "whatsapp-web.js": "1.23.0"
+    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/ping": "^0.4.4",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "prisma": "^6.17.1",
