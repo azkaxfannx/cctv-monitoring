@@ -59,6 +59,10 @@ export default function Dashboard() {
 
     newSocket.on("connect", () => {
       console.log("✅ WebSocket Connected:", newSocket.id);
+
+      if (selectedCamera) {
+        newSocket.emit("join_camera_updates", selectedCamera.id);
+      }
     });
 
     newSocket.on("disconnect", (reason) => {
@@ -95,6 +99,12 @@ export default function Dashboard() {
       }
     };
   }, []); // Empty dependency - HANYA SEKALAI
+
+  useEffect(() => {
+    if (socketRef.current && selectedCamera) {
+      socketRef.current.emit("join_camera_updates", selectedCamera.id);
+    }
+  }, [selectedCamera]);
 
   // Fetch cameras - terpisah dari WebSocket
   useEffect(() => {

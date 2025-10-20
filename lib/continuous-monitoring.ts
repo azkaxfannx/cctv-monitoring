@@ -88,7 +88,6 @@ class ContinuousMonitor {
       const results = await Promise.allSettled(
         cameras.map(async (camera) => {
           try {
-            // GUNAKAN monitorCamera YANG SUDAH ADA DEBUG-NYA
             const result = await monitorCamera(camera);
 
             // Kirim WebSocket update jika status berubah
@@ -111,26 +110,16 @@ class ContinuousMonitor {
               status: result.newStatus,
               isOnline: result.newStatus !== "offline",
               statusChanged: result.statusChanged,
+              logged: result.shouldLog,
             };
           } catch (error) {
             console.error(`[MONITOR ERROR] Camera ${camera.name}:`, error);
-
-            // Log error ke database
-            await prisma.cameraLog.create({
-              data: {
-                cameraId: camera.id,
-                event: "monitor_error",
-                details: `Error during monitoring: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`,
-              },
-            });
-
             return {
               cameraId: camera.id,
               status: "error",
               isOnline: false,
               statusChanged: false,
+              logged: false,
             };
           }
         })
@@ -142,15 +131,13 @@ class ContinuousMonitor {
         (r) => r.status === "fulfilled"
       ).length;
       const errorCount = results.filter((r) => r.status === "rejected").length;
+      const loggedCount = results.filter(
+        (r) => r.status === "fulfilled" && r.value.logged
+      ).length;
 
       console.log(
-        `[MONITOR] Completed: ${successCount} success, ${errorCount} errors`
+        `[MONITOR] Completed: ${successCount} success, ${errorCount} errors, ${loggedCount} logged`
       );
-
-      // Log summary monitoring
-      if (errorCount > 0) {
-        console.log(`[MONITOR WARNING] ${errorCount} cameras had errors`);
-      }
     } catch (error) {
       console.error("[MONITOR ERROR]:", error);
     }

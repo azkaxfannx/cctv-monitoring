@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import axios from "axios";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { smartStatusLogging, createStatusLog } from "./smart-logging";
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();
@@ -287,7 +288,6 @@ export async function monitorCamera(camera: any) {
       newStatus = "online";
 
       // 2. SCRAPE DATE (hanya jika online)
-      // Handle null values safely
       const username = camera.username ? String(camera.username) : undefined;
       const password = camera.password ? String(camera.password) : undefined;
 
@@ -306,7 +306,7 @@ export async function monitorCamera(camera: any) {
 
     const statusChanged = camera.status !== newStatus;
 
-    // 3. UPDATE DATABASE
+    // 3. UPDATE DATABASE (selalu update status terbaru)
     await prisma.camera.update({
       where: { id: camera.id },
       data: {
@@ -317,29 +317,53 @@ export async function monitorCamera(camera: any) {
       },
     });
 
-    // 4. LOG EVENT
-    let event = isOnline ? "ping_success" : "ping_failed";
-    if (isOnline && cameraDate) {
-      event = cameraDate === today ? "date_ok" : "date_error";
-    }
-
-    await prisma.cameraLog.create({
-      data: {
-        cameraId: camera.id,
-        event,
-        details: cameraDate
-          ? `Camera date: ${cameraDate}, Expected: ${today}`
-          : `No date found. Status: ${newStatus}`,
-      },
-    });
-
-    console.log(
-      `[MONITOR END] ${camera.name} -> Status: ${newStatus}, Changed: ${statusChanged}\n`
+    // 4. SMART LOGGING - hanya log ketika diperlukan
+    const loggingResult = await smartStatusLogging(
+      camera.id,
+      newStatus,
+      cameraDate ? `Camera date: ${cameraDate}` : undefined
     );
 
-    return { statusChanged, newStatus, cameraDate };
+    if (loggingResult.shouldLog) {
+      console.log(
+        `[SMART LOG] Creating log for ${camera.name}: ${loggingResult.eventType}`
+      );
+
+      await createStatusLog(
+        camera.id,
+        loggingResult.eventType,
+        cameraDate
+          ? `Camera date: ${cameraDate}, Expected: ${today}`
+          : `Status: ${newStatus}`
+      );
+    } else {
+      console.log(
+        `[SMART LOG] Skipping log for ${camera.name} (consecutive: ${loggingResult.eventType})`
+      );
+    }
+
+    console.log(
+      `[MONITOR END] ${camera.name} -> Status: ${newStatus}, Changed: ${statusChanged}, Logged: ${loggingResult.shouldLog}\n`
+    );
+
+    return {
+      statusChanged,
+      newStatus,
+      cameraDate,
+      shouldLog: loggingResult.shouldLog,
+      eventType: loggingResult.eventType,
+    };
   } catch (error) {
     console.error(`[MONITOR ERROR] ${camera.name}:`, error);
+
+    // Untuk error, selalu log
+    await createStatusLog(
+      camera.id,
+      "monitor_error",
+      `Monitoring error: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
 
     // Update status ke error
     await prisma.camera.update({
@@ -350,17 +374,13 @@ export async function monitorCamera(camera: any) {
       },
     });
 
-    await prisma.cameraLog.create({
-      data: {
-        cameraId: camera.id,
-        event: "monitor_error",
-        details: `Monitoring error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      },
-    });
-
-    return { statusChanged: true, newStatus: "error", cameraDate: null };
+    return {
+      statusChanged: true,
+      newStatus: "error",
+      cameraDate: null,
+      shouldLog: true,
+      eventType: "monitor_error",
+    };
   }
 }
 
