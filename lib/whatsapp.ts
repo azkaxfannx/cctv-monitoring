@@ -1,4 +1,5 @@
 import { Client, LocalAuth } from "whatsapp-web.js";
+import qrcode from "qrcode-terminal";
 
 let waClient: Client | null = null;
 
@@ -7,14 +8,40 @@ export async function initWhatsApp() {
 
   waClient = new Client({
     authStrategy: new LocalAuth(),
+    puppeteer: {
+      headless: true,
+      executablePath:
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", // sesuaikan path Chrome-mu
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-gpu",
+      ],
+    },
   });
 
   waClient.on("qr", (qr) => {
-    console.log("Scan QR Code:", qr);
+    console.log("📱 Scan QR Code di bawah ini untuk login WhatsApp:");
+    qrcode.generate(qr, { small: true });
+  });
+  waClient.on("authenticated", () => {
+    console.log("🔐 WhatsApp Authenticated!");
   });
 
   waClient.on("ready", () => {
-    console.log("WhatsApp Bot ready!");
+    console.log("✅ WhatsApp Bot ready!");
+  });
+
+  waClient.on("auth_failure", (err) => {
+    console.error("❌ WhatsApp Authentication failed:", err);
+  });
+
+  waClient.on("disconnected", (reason) => {
+    console.log("❌ WhatsApp disconnected:", reason);
   });
 
   await waClient.initialize();
