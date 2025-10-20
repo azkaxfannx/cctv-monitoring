@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { cameraId: string } }
+  { params }: { params: { id: string } } // ← Ubah dari cameraId ke id
 ) {
   try {
-    const cameraId = params.cameraId;
+    const cameraId = params.id; // ← Ambil dari params.id
 
     console.log(`🔍 [API LOGS] Fetching logs for cameraId: "${cameraId}"`);
     console.log(`🔍 [API LOGS] Request URL: ${req.url}`);
