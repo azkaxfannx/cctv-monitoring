@@ -72,6 +72,11 @@ export async function whatsappAlert(
     } else if (status === "date_error") {
       const today = new Date().toISOString().split("T")[0];
       message = `🚨 CCTV Alert\n🟡 ${camera.name} (${camera.ip})\nTanggal di kamera: ${cameraDate}\nSeharusnya: ${today}`;
+    } else if (status === "online") {
+      // ✅ TAMBAHKAN INI
+      message = `✅ CCTV Recovery\n🟢 ${camera.name} (${
+        camera.ip
+      })\nStatus: KEMBALI ONLINE\nWaktu: ${new Date().toLocaleString("id-ID")}`;
     }
 
     if (message) {

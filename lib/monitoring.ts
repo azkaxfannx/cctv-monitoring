@@ -532,10 +532,7 @@ export async function monitorCamera(camera: any) {
       );
 
       // 📱 KIRIM WHATSAPP ALERT JIKA STATUS BERUBAH
-      if (
-        statusChanged &&
-        (newStatus === "offline" || newStatus === "date_error")
-      ) {
+      if (statusChanged) {
         console.log(
           `[${camera.id}] 📱 Sending WhatsApp alert for status change`
         );

@@ -1,6 +1,6 @@
 // lib/continuous-monitoring.ts
 import { PrismaClient } from "@prisma/client";
-import { monitorCamera } from "./monitoring"; // IMPORT monitorCamera, bukan fungsi individual
+import { monitorCamera } from "./monitoring";
 
 const prisma = new PrismaClient();
 

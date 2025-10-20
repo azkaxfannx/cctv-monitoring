@@ -55,10 +55,9 @@ export async function sendDailyReport() {
       message += `- (Tidak ada)\n`;
     } else {
       dateErrorCameras.forEach((cam, index) => {
-        const today = new Date().toISOString().split("T")[0];
         message += `${index + 1}. ${cam.name} (${cam.ip})\n   Tanggal Kamera: ${
           cam.cameraDate
-        }\n   Seharusnya: ${today}\n`;
+        }\n   Seharusnya: ${today}\n`; // ✅ Pakai variable `today` dari luar
       });
     }
 
