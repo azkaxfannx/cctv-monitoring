@@ -152,7 +152,7 @@ async function start() {
 
 async function scheduleDailyReport() {
   cron.schedule(
-    "0 8 * * *",
+    "48 1 * * *",
     async () => {
       console.log("⏰ [CRON] Running daily report at 8:00 AM WIB");
 
