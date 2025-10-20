@@ -5,19 +5,38 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "node server.js",
+    "start1": "next start"
   },
   "dependencies": {
+    "@prisma/client": "^6.17.1",
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0",
+    "class-variance-authority": "0.7.0",
+    "clsx": "2.1.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "0.263.1",
+    "next": "15.5.6",
+    "node-cron": "3.0.3",
+    "ping": "0.4.4",
+    "qrcode-terminal": "0.12.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.6"
+    "react-leaflet": "^5.0.0",
+    "socket.io": "4.7.0",
+    "socket.io-client": "^4.7.0",
+    "tailwind-merge": "2.2.0",
+    "whatsapp-web.js": "1.23.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
+    "@types/ping": "^0.4.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "prisma": "^6.17.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

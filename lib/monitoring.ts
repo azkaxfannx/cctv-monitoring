@@ -1,0 +1,387 @@
+import { PrismaClient } from "@prisma/client";
+import axios from "axios";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
+const prisma = new PrismaClient();
+
+export async function pingCamera(ip: string): Promise<boolean> {
+  try {
+    const command =
+      process.platform === "win32"
+        ? `ping -n 1 -w 2000 ${ip}`
+        : `ping -c 1 -W 2000 ${ip}`;
+
+    const { stdout, stderr } = await execAsync(command, { timeout: 5000 });
+
+    const isAlive =
+      !stderr &&
+      (stdout.includes("bytes=") || stdout.includes("1 packets received"));
+    console.log(`[PING] ${ip} -> ${isAlive ? "ALIVE" : "DEAD"}`);
+
+    return isAlive;
+  } catch (error) {
+    console.error(`[PING ERROR] ${ip}:`, error);
+    return false;
+  }
+}
+
+export async function scrapeCameraDate(
+  ip: string,
+  username?: string,
+  password?: string
+): Promise<string | null> {
+  console.log(`\n[SCRAPE DEBUG START] ${ip}`);
+  console.log(`[SCRAPE DEBUG] Username: ${username || "NOT PROVIDED"}`);
+  console.log(
+    `[SCRAPE DEBUG] Password: ${password ? "***PROVIDED***" : "NOT PROVIDED"}`
+  );
+
+  try {
+    // Endpoint khusus untuk Hikvision dan Samsung
+    const endpoints = [
+      // Hikvision endpoints
+      "/ISAPI/System/deviceInfo", // Device info API
+      "/ISAPI/System/time", // System time API
+      "/doc/page/config.asp", // Web config page
+      "/doc/page/preview.asp", // Web preview page
+
+      // Samsung endpoints
+      "/stw-cgi/system.cgi?action=get", // Samsung system info
+      "/config/system.cgi", // Samsung config
+      "/cgi-bin/systeminfo", // Samsung system info
+
+      // Common endpoints
+      "/system",
+      "/config",
+      "/",
+    ];
+
+    let finalDate = null;
+
+    for (const endpoint of endpoints) {
+      console.log(`[SCRAPE DEBUG] Trying endpoint: ${endpoint}`);
+
+      const baseUrl = `http://${ip}`;
+      const config: any = {
+        timeout: 10000,
+        validateStatus: function (status: number) {
+          return status >= 200 && status < 600;
+        },
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "*/*",
+          "Accept-Language": "en-US,en;q=0.5",
+        },
+      };
+
+      // Tambahkan authentication jika username & password ada
+      if (username && password) {
+        console.log(`[SCRAPE DEBUG] Using authentication for ${endpoint}`);
+        config.auth = {
+          username: username,
+          password: password,
+        };
+      }
+
+      try {
+        console.log(
+          `[SCRAPE DEBUG] Making request to ${baseUrl}${endpoint}...`
+        );
+        const response = await axios.get(`${baseUrl}${endpoint}`, config);
+
+        console.log(`[SCRAPE DEBUG] ${endpoint} -> Status: ${response.status}`);
+
+        if (response.status === 200) {
+          console.log(`[SCRAPE DEBUG] SUCCESS: ${endpoint} returned 200`);
+
+          const responseData = response.data;
+          const contentType = response.headers["content-type"] || "";
+
+          console.log(`[SCRAPE DEBUG] Content-Type: ${contentType}`);
+          console.log(`[SCRAPE DEBUG] Response type: ${typeof responseData}`);
+
+          // Handle berdasarkan endpoint dan content type
+          let extractedDate = null;
+
+          if (endpoint.includes("/ISAPI/")) {
+            // Hikvision XML API
+            extractedDate = extractDateFromHikvisionXML(responseData);
+          } else if (endpoint.includes(".cgi")) {
+            // Samsung CGI API
+            extractedDate = extractDateFromSamsungCGI(responseData);
+          } else if (contentType.includes("text/html")) {
+            // HTML pages
+            extractedDate = extractDateFromHTML(responseData);
+          } else {
+            // Try generic extraction
+            extractedDate = extractDateGeneric(responseData);
+          }
+
+          if (extractedDate) {
+            console.log(
+              `[SCRAPE DEBUG] ✅ DATE FOUND in ${endpoint}: ${extractedDate}`
+            );
+            finalDate = extractedDate;
+            break;
+          } else {
+            console.log(`[SCRAPE DEBUG] ❌ No date found in ${endpoint}`);
+
+            // Debug content untuk analisis
+            if (typeof responseData === "string") {
+              console.log(
+                `[SCRAPE DEBUG] First 300 chars: ${responseData.substring(
+                  0,
+                  300
+                )}`
+              );
+            }
+          }
+        } else if (response.status === 401) {
+          console.log(
+            `[SCRAPE DEBUG] ❌ Authentication failed for ${endpoint}`
+          );
+        } else if (response.status === 404) {
+          console.log(`[SCRAPE DEBUG] ❌ Endpoint not found: ${endpoint}`);
+        } else if (response.status === 403) {
+          console.log(`[SCRAPE DEBUG] ❌ Access forbidden: ${endpoint}`);
+        }
+      } catch (endpointError: any) {
+        console.log(
+          `[SCRAPE DEBUG] Error with ${endpoint}: ${endpointError.message}`
+        );
+      }
+    }
+
+    console.log(`[SCRAPE] ${ip} -> Final Date: ${finalDate || "NOT FOUND"}`);
+    return finalDate;
+  } catch (error: any) {
+    console.log(`[SCRAPE DEBUG] Overall error:`, error.message);
+    return null;
+  } finally {
+    console.log(`[SCRAPE DEBUG END] ${ip}\n`);
+  }
+}
+
+// Extract date dari Hikvision XML API
+function extractDateFromHikvisionXML(xmlData: string): string | null {
+  try {
+    console.log(`[HIKVISION XML] Parsing XML data`);
+
+    // Pattern untuk XML date fields
+    const datePatterns = [
+      /<time>(\d{4}-\d{2}-\d{2})/i,
+      /<localTime>(\d{4}-\d{2}-\d{2})/i,
+      /<systemTime>(\d{4}-\d{2}-\d{2})/i,
+      /<currentTime>(\d{4}-\d{2}-\d{2})/i,
+      /time="(\d{4}-\d{2}-\d{2})/i,
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = xmlData.match(pattern);
+      if (match) {
+        console.log(`[HIKVISION XML] Found with pattern: ${match[1]}`);
+        return match[1];
+      }
+    }
+
+    // Cari format tanggal lain dalam XML
+    const genericDateMatch = xmlData.match(/(\d{4}-\d{2}-\d{2})/);
+    if (genericDateMatch) {
+      console.log(`[HIKVISION XML] Found generic date: ${genericDateMatch[1]}`);
+      return genericDateMatch[1];
+    }
+  } catch (error) {
+    console.log(`[HIKVISION XML] Error parsing XML:`, error);
+  }
+  return null;
+}
+
+// Extract date dari Samsung CGI
+function extractDateFromSamsungCGI(cgiData: string): string | null {
+  console.log(`[SAMSUNG CGI] Parsing CGI data`);
+
+  // Pattern untuk Samsung CGI response
+  const datePatterns = [
+    /date=(\d{4}-\d{2}-\d{2})/i,
+    /system_date=(\d{4}-\d{2}-\d{2})/i,
+    /current_date=(\d{4}-\d{2}-\d{2})/i,
+    /"date":"(\d{4}-\d{2}-\d{2})"/i,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = cgiData.match(pattern);
+    if (match) {
+      console.log(`[SAMSUNG CGI] Found with pattern: ${match[1]}`);
+      return match[1];
+    }
+  }
+
+  // Cari format umum
+  const genericDateMatch = cgiData.match(/(\d{4}-\d{2}-\d{2})/);
+  if (genericDateMatch) {
+    console.log(`[SAMSUNG CGI] Found generic date: ${genericDateMatch[1]}`);
+    return genericDateMatch[1];
+  }
+
+  return null;
+}
+
+// Extract date dari HTML (untuk web interface)
+function extractDateFromHTML(html: string): string | null {
+  console.log(`[HTML] Parsing HTML data`);
+
+  const datePatterns = [
+    /(\d{4}-\d{2}-\d{2})/,
+    /value="(\d{4}-\d{2}-\d{2})"/,
+    /id=".*date.*".*value="(\d{4}-\d{2}-\d{2})"/i,
+    /name=".*date.*".*value="(\d{4}-\d{2}-\d{2})"/i,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      console.log(`[HTML] Found with pattern: ${match[1]}`);
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// Extract date generic dari berbagai format
+function extractDateGeneric(data: any): string | null {
+  const dataString = typeof data === "string" ? data : JSON.stringify(data);
+
+  // Cari pattern tanggal YYYY-MM-DD
+  const dateMatch = dataString.match(/(\d{4}-\d{2}-\d{2})/);
+  if (dateMatch) {
+    console.log(`[GENERIC] Found date: ${dateMatch[1]}`);
+    return dateMatch[1];
+  }
+
+  return null;
+}
+
+export async function monitorCamera(camera: any) {
+  const today = new Date().toISOString().split("T")[0];
+
+  console.log(`\n[MONITOR START] Camera: ${camera.name} (${camera.ip})`);
+  console.log(`[MONITOR DEBUG] Username from DB: "${camera.username}"`);
+  console.log(
+    `[MONITOR DEBUG] Password from DB: "${
+      camera.password ? "***SET***" : "NOT SET"
+    }"`
+  );
+
+  try {
+    // 1. PING CHECK
+    const isOnline = await pingCamera(camera.ip);
+    console.log(`[MONITOR DEBUG] Ping result: ${isOnline}`);
+
+    let newStatus = "offline";
+    let cameraDate = null;
+
+    if (isOnline) {
+      newStatus = "online";
+
+      // 2. SCRAPE DATE (hanya jika online)
+      // Handle null values safely
+      const username = camera.username ? String(camera.username) : undefined;
+      const password = camera.password ? String(camera.password) : undefined;
+
+      console.log(`[MONITOR DEBUG] Starting date scrape...`);
+      cameraDate = await scrapeCameraDate(camera.ip, username, password);
+
+      if (cameraDate && cameraDate !== today) {
+        newStatus = "date_error";
+        console.log(`[DATE ERROR] Expected: ${today}, Got: ${cameraDate}`);
+      } else if (cameraDate === today) {
+        console.log(`[DATE OK] ${cameraDate}`);
+      } else {
+        console.log(`[DATE DEBUG] No date found or date is null`);
+      }
+    }
+
+    const statusChanged = camera.status !== newStatus;
+
+    // 3. UPDATE DATABASE
+    await prisma.camera.update({
+      where: { id: camera.id },
+      data: {
+        status: newStatus,
+        cameraDate,
+        lastUpdate: new Date(),
+        lastOnline: isOnline ? new Date() : camera.lastOnline,
+      },
+    });
+
+    // 4. LOG EVENT
+    let event = isOnline ? "ping_success" : "ping_failed";
+    if (isOnline && cameraDate) {
+      event = cameraDate === today ? "date_ok" : "date_error";
+    }
+
+    await prisma.cameraLog.create({
+      data: {
+        cameraId: camera.id,
+        event,
+        details: cameraDate
+          ? `Camera date: ${cameraDate}, Expected: ${today}`
+          : `No date found. Status: ${newStatus}`,
+      },
+    });
+
+    console.log(
+      `[MONITOR END] ${camera.name} -> Status: ${newStatus}, Changed: ${statusChanged}\n`
+    );
+
+    return { statusChanged, newStatus, cameraDate };
+  } catch (error) {
+    console.error(`[MONITOR ERROR] ${camera.name}:`, error);
+
+    // Update status ke error
+    await prisma.camera.update({
+      where: { id: camera.id },
+      data: {
+        status: "error",
+        lastUpdate: new Date(),
+      },
+    });
+
+    await prisma.cameraLog.create({
+      data: {
+        cameraId: camera.id,
+        event: "monitor_error",
+        details: `Monitoring error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      },
+    });
+
+    return { statusChanged: true, newStatus: "error", cameraDate: null };
+  }
+}
+
+export async function monitorCameraWithSocket(camera: any) {
+  const result = await monitorCamera(camera);
+
+  // Kirim update via WebSocket jika status berubah
+  if (result.statusChanged && (global as any).io) {
+    (global as any).io.emit("camera_status_change", {
+      id: camera.id,
+      name: camera.name,
+      ip: camera.ip,
+      status: result.newStatus,
+      cameraDate: result.cameraDate,
+      lastUpdate: new Date(),
+    });
+
+    console.log(
+      `📡 WebSocket update sent for ${camera.name}: ${result.newStatus}`
+    );
+  }
+
+  return result;
+}
