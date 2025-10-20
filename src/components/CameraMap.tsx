@@ -1,20 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-
-interface Camera {
-  id: string;
-  name: string;
-  ip: string;
-  status: string;
-  latitude: number;
-  longitude: number;
-  cameraDate: string | null;
-  lastOnline: string | null;
-}
+import { Camera } from "@/types/camera";
 
 interface CameraMapProps {
   cameras: Camera[];
+  selectedCamera?: Camera | null;
+  onCameraClick?: (camera: Camera) => void;
   placingMode?: boolean;
   onPlaceCamera?: (lat: number, lng: number) => void;
 }
@@ -31,12 +23,16 @@ const MapComponent = dynamic(() => import("./MapComponent"), {
 
 export function CameraMap({
   cameras,
+  selectedCamera = null,
+  onCameraClick,
   placingMode = false,
   onPlaceCamera,
 }: CameraMapProps) {
   return (
     <MapComponent
       cameras={cameras}
+      selectedCamera={selectedCamera}
+      onCameraClick={onCameraClick}
       placingMode={placingMode}
       onPlaceCamera={onPlaceCamera}
     />

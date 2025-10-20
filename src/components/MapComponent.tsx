@@ -3,20 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-interface Camera {
-  id: string;
-  name: string;
-  ip: string;
-  status: string;
-  latitude: number;
-  longitude: number;
-  cameraDate: string | null;
-  lastOnline: string | null;
-}
+import { Camera } from "@/types/camera";
 
 interface MapComponentProps {
   cameras: Camera[];
+  selectedCamera?: Camera | null;
+  onCameraClick?: (camera: Camera) => void;
   onLocationReady?: (lat: number, lng: number) => void;
   placingMode?: boolean;
   onPlaceCamera?: (lat: number, lng: number) => void;
@@ -24,6 +16,8 @@ interface MapComponentProps {
 
 export default function MapComponent({
   cameras,
+  selectedCamera = null,
+  onCameraClick,
   onLocationReady,
   placingMode = false,
   onPlaceCamera,
@@ -171,11 +165,13 @@ export default function MapComponent({
           ? "#eab308"
           : "#ef4444";
 
+      const isSelected = selectedCamera?.id === camera.id;
+
       const marker = L.circleMarker([camera.latitude, camera.longitude], {
-        radius: 10,
+        radius: isSelected ? 14 : 10, // Lebih besar jika selected
         fillColor: color,
-        color: color,
-        weight: 2,
+        color: isSelected ? "#3b82f6" : color, // Border biru jika selected
+        weight: isSelected ? 4 : 2, // Border lebih tebal jika selected
         opacity: 1,
         fillOpacity: 0.8,
       })
@@ -204,9 +200,22 @@ export default function MapComponent({
         )
         .addTo(mapRef.current!);
 
+      // Tambahkan event click untuk marker
+      marker.on("click", () => {
+        console.log(`🗺️ Map clicked camera: ${camera.name}`);
+        if (onCameraClick) {
+          onCameraClick(camera);
+        }
+      });
+
       markersRef.current.set(camera.id, marker);
+
+      // Auto open popup jika camera ini yang dipilih
+      if (isSelected) {
+        marker.openPopup();
+      }
     });
-  }, [cameras, placingMode, isMapReady]);
+  }, [cameras, selectedCamera, placingMode, isMapReady, onCameraClick]);
 
   return <div id="map" className="w-full h-96 lg:h-screen rounded-lg" />;
 }

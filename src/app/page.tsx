@@ -4,18 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { CameraMap } from "@/components/CameraMap";
 import { CameraHistory } from "@/components/CameraHistory";
 import io, { Socket } from "socket.io-client";
-
-interface Camera {
-  id: string;
-  name: string;
-  ip: string;
-  status: string;
-  latitude: number;
-  longitude: number;
-  cameraDate: string | null;
-  lastUpdate: string;
-  lastOnline: string | null;
-}
+import { Camera } from "@/types/camera";
 
 export default function Dashboard() {
   const [cameras, setCameras] = useState<Camera[]>([]);
@@ -36,6 +25,11 @@ export default function Dashboard() {
   const socketRef = useRef<Socket | null>(null);
   const selectedCameraRef = useRef<Camera | null>(null);
 
+  // Update ref ketika selectedCamera berubah
+  useEffect(() => {
+    selectedCameraRef.current = selectedCamera;
+  }, [selectedCamera]);
+
   useEffect(() => {
     console.log("🔄 Setting up WebSocket...");
 
@@ -54,11 +48,11 @@ export default function Dashboard() {
     newSocket.on("connect", () => {
       console.log("✅ WebSocket Connected:", newSocket.id);
 
-      // Join camera room jika ada selected camera
-      if (selectedCamera) {
-        newSocket.emit("join_camera_updates", selectedCamera.id);
-        console.log(`📡 Joined camera room: ${selectedCamera.id}`);
-      }
+      // Join room untuk semua camera agar dapat update real-time
+      cameras.forEach((camera) => {
+        newSocket.emit("join_camera_updates", camera.id);
+        console.log(`📡 Joined camera room: ${camera.id}`);
+      });
     });
 
     newSocket.on("disconnect", (reason) => {
@@ -73,17 +67,18 @@ export default function Dashboard() {
       console.log(
         "📡 WebSocket update received for camera:",
         updatedCamera.id,
-        updatedCamera.status
+        updatedCamera.status,
+        updatedCamera.cameraDate
       );
 
-      // Pastikan update hanya untuk camera yang benar
+      // Update cameras list
       setCameras((prev) =>
         prev.map((cam) =>
           cam.id === updatedCamera.id ? { ...cam, ...updatedCamera } : cam
         )
       );
 
-      // Update selected camera hanya jika ID-nya match
+      // Update selected camera jika ID-nya match
       if (selectedCameraRef.current?.id === updatedCamera.id) {
         console.log(
           `📡 Updating selected camera: ${updatedCamera.name} -> ${updatedCamera.status}`
@@ -102,26 +97,20 @@ export default function Dashboard() {
         socketRef.current = null;
       }
     };
-  }, []); // Empty dependency - HANYA SEKALAI
+  }, []); // Empty dependency - HANYA SEKALI
 
-  // Handle selected camera changes untuk join/leave room
+  // Handle cameras changes untuk join room
   useEffect(() => {
-    if (!socketRef.current) return;
+    if (!socketRef.current || !socketRef.current.connected) return;
 
     const socket = socketRef.current;
 
-    if (selectedCamera) {
-      // Join room untuk camera yang dipilih
-      socket.emit("join_camera_updates", selectedCamera.id);
-      console.log(`📡 Joined camera room: ${selectedCamera.id}`);
-
-      // Leave other rooms? atau biarkan multiple rooms?
-    } else {
-      // Leave semua camera rooms ketika tidak ada selected camera
-      // Atau biarkan saja, tidak perlu leave
-      console.log("📡 No camera selected");
-    }
-  }, [selectedCamera]);
+    // Join room untuk semua camera
+    cameras.forEach((camera) => {
+      socket.emit("join_camera_updates", camera.id);
+      console.log(`📡 Joined camera room: ${camera.id}`);
+    });
+  }, [cameras]);
 
   // Fetch cameras - terpisah dari WebSocket
   useEffect(() => {
@@ -142,8 +131,18 @@ export default function Dashboard() {
     // Jika camera yang sama diklik, toggle selection
     if (selectedCamera?.id === camera.id) {
       setSelectedCamera(null);
+      console.log(`📡 Deselected camera: ${camera.name}`);
     } else {
       setSelectedCamera(camera);
+      console.log(`📡 Selected camera: ${camera.name} (${camera.id})`);
+
+      // Log hanya untuk camera yang dipilih
+      console.group(`🔍 Camera Details: ${camera.name}`);
+      console.log(`📍 Status: ${camera.status}`);
+      console.log(`📅 Camera Date: ${camera.cameraDate}`);
+      console.log(`🕒 Last Update: ${camera.lastUpdate}`);
+      console.log(`📡 Last Online: ${camera.lastOnline}`);
+      console.groupEnd();
     }
   };
 
@@ -263,6 +262,8 @@ export default function Dashboard() {
           <div className="lg:col-span-3 bg-slate-800 rounded-lg shadow-lg overflow-hidden">
             <CameraMap
               cameras={cameras}
+              selectedCamera={selectedCamera}
+              onCameraClick={handleCameraClick}
               placingMode={placingMode}
               onPlaceCamera={handlePlaceCamera}
             />
@@ -324,6 +325,12 @@ export default function Dashboard() {
                                 {cam.status.toUpperCase()}
                               </span>
                             </div>
+                            {/* Tampilkan tanggal kamera */}
+                            {cam.cameraDate && (
+                              <p className="text-xs text-slate-300 mt-1">
+                                📅 {new Date(cam.cameraDate).toLocaleString()}
+                              </p>
+                            )}
                           </div>
                           <button
                             onClick={(e) => {
@@ -345,11 +352,13 @@ export default function Dashboard() {
                   <CameraHistory
                     cameraId={selectedCamera.id}
                     cameraName={selectedCamera.name}
+                    cameraStatus={selectedCamera.status}
+                    cameraDate={selectedCamera.cameraDate}
                   />
                 )}
               </>
             ) : (
-              /* Placing Mode Panel */
+              /* Placing Mode Panel (tetap sama) */
               <div className="bg-slate-800 rounded-lg p-4 space-y-4">
                 <h3 className="font-bold text-lg">Tambah Kamera Baru</h3>
 
