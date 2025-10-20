@@ -48,7 +48,7 @@ export default function Dashboard() {
     newSocket.on("connect", () => {
       console.log("✅ WebSocket Connected:", newSocket.id);
 
-      // Join room untuk semua camera agar dapat update real-time
+      // Join room untuk SEMUA camera yang ada
       cameras.forEach((camera) => {
         newSocket.emit("join_camera_updates", camera.id);
         console.log(`📡 Joined camera room: ${camera.id}`);
@@ -65,23 +65,23 @@ export default function Dashboard() {
 
     newSocket.on("camera_status_change", (updatedCamera) => {
       console.log(
-        "📡 WebSocket update received for camera:",
+        "📡 WebSocket update received SPECIFICALLY for camera:",
         updatedCamera.id,
         updatedCamera.status,
         updatedCamera.cameraDate
       );
 
-      // Update cameras list
+      // Update cameras list - HANYA camera yang di-update
       setCameras((prev) =>
         prev.map((cam) =>
           cam.id === updatedCamera.id ? { ...cam, ...updatedCamera } : cam
         )
       );
 
-      // Update selected camera jika ID-nya match
+      // Update selected camera hanya jika ID-nya match
       if (selectedCameraRef.current?.id === updatedCamera.id) {
         console.log(
-          `📡 Updating selected camera: ${updatedCamera.name} -> ${updatedCamera.status}`
+          `📡 Updating SELECTED camera: ${updatedCamera.name} -> ${updatedCamera.status}`
         );
         setSelectedCamera((prev) =>
           prev ? { ...prev, ...updatedCamera } : null
@@ -92,25 +92,16 @@ export default function Dashboard() {
     return () => {
       console.log("🧹 Cleaning up WebSocket");
       if (socketRef.current) {
+        // Leave semua rooms sebelum disconnect
+        cameras.forEach((camera) => {
+          socketRef.current?.emit("leave_camera_updates", camera.id);
+        });
         socketRef.current.removeAllListeners();
         socketRef.current.close();
         socketRef.current = null;
       }
     };
   }, []); // Empty dependency - HANYA SEKALI
-
-  // Handle cameras changes untuk join room
-  useEffect(() => {
-    if (!socketRef.current || !socketRef.current.connected) return;
-
-    const socket = socketRef.current;
-
-    // Join room untuk semua camera
-    cameras.forEach((camera) => {
-      socket.emit("join_camera_updates", camera.id);
-      console.log(`📡 Joined camera room: ${camera.id}`);
-    });
-  }, [cameras]);
 
   // Fetch cameras - terpisah dari WebSocket
   useEffect(() => {

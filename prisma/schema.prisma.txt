@@ -1,0 +1,39 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Camera {
+  id        String   @id @default(cuid())
+  name      String
+  ip        String   @unique
+  username  String?
+  password  String?
+  latitude  Float
+  longitude Float
+  
+  status    String   @default("unknown") // online, offline, date_error
+  cameraDate String?
+  lastUpdate DateTime @default(now()) @updatedAt
+  lastOnline DateTime?
+  
+  logs      CameraLog[]
+  
+  @@map("cameras")
+}
+
+model CameraLog {
+  id        String   @id @default(cuid())
+  cameraId  String
+  camera    Camera   @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  
+  event     String   // ping_success, ping_failed, date_ok, date_error
+  details   String?
+  createdAt DateTime @default(now())
+  
+  @@map("camera_logs")
+}
