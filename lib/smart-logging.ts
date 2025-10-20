@@ -100,13 +100,24 @@ export async function createStatusLog(
   event: string,
   details?: string
 ) {
-  return await prisma.cameraLog.create({
+  const newLog = await prisma.cameraLog.create({
     data: {
       cameraId,
       event,
       details,
     },
   });
+
+  // 🔥 TAMBAHKAN INI: Emit WebSocket untuk real-time log updates
+  if ((global as any).io) {
+    (global as any).io.emitToCamera(cameraId, "new_camera_log", {
+      cameraId,
+      log: newLog,
+    });
+    console.log(`📨 WebSocket: New log emitted for camera ${cameraId}`);
+  }
+
+  return newLog;
 }
 
 // Reset history untuk camera (misal setelah manual intervention)
