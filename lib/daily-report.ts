@@ -8,11 +8,12 @@ export async function sendDailyReport() {
   try {
     console.log("📊 Generating daily report...");
 
-    // ✅ FIX: Paksa pakai WIB
+    // ✅ Pisahkan: tanggal pakai WIB, jam pakai lokal
     const now = new Date();
     const wibOffset = 7 * 60 * 60 * 1000;
     const nowWIB = new Date(now.getTime() + wibOffset);
-    const today = nowWIB.toISOString().split("T")[0];
+    const today = nowWIB.toISOString().split("T")[0]; // Tanggal WIB
+    const currentTime = now.toLocaleTimeString("id-ID"); // Jam lokal (udah WIB otomatis)
 
     // Ambil semua camera dengan status problematic
     const offlineCameras = await prisma.camera.findMany({
@@ -32,7 +33,7 @@ export async function sendDailyReport() {
     // Format message untuk daily report
     let message = `📋 *LAPORAN HARIAN CCTV* \n`;
     message += `Tanggal: ${today}\n`;
-    message += `Waktu: ${nowWIB.toLocaleTimeString("id-ID")}\n`;
+    message += `Waktu: ${currentTime}\n`;
     message += `\n📊 *STATISTIK:*\n`;
     message += `✅ Online: ${onlineCameras}\n`;
     message += `🔴 Offline: ${offlineCameras.length}\n`;
@@ -65,8 +66,6 @@ export async function sendDailyReport() {
         }\n   Seharusnya: ${today}\n`;
       });
     }
-
-    message += `\n⏰ *Update Terakhir:* ${nowWIB.toLocaleString("id-ID")}`;
 
     // Kirim via WhatsApp
     const groupId = process.env.WHATSAPP_GROUP_ID;

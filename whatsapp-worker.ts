@@ -163,7 +163,8 @@ async function scheduleDailyReport() {
         const now = new Date();
         const wibOffset = 7 * 60 * 60 * 1000;
         const nowWIB = new Date(now.getTime() + wibOffset);
-        const today = nowWIB.toISOString().split("T")[0];
+        const today = nowWIB.toISOString().split("T")[0]; // Tanggal WIB
+        const currentTime = now.toLocaleTimeString("id-ID"); // Jam lokal (udah WIB otomatis)
 
         const offlineCameras = await prisma.camera.findMany({
           where: { status: "offline" },
@@ -181,7 +182,7 @@ async function scheduleDailyReport() {
 
         let message = `📋 *LAPORAN HARIAN CCTV* \n`;
         message += `Tanggal: ${today}\n`;
-        message += `Waktu: ${nowWIB.toLocaleTimeString("id-ID")}\n`;
+        message += `Waktu: ${currentTime}\n`;
         message += `\n📊 *STATISTIK:*\n`;
         message += `✅ Online: ${onlineCameras}\n`;
         message += `🔴 Offline: ${offlineCameras.length}\n`;
