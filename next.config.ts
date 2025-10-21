@@ -13,10 +13,6 @@ const nextConfig: NextConfig = {
         net: false,
         tls: false,
       };
-      config.watchOptions = {
-        ...config.watchOptions,
-        ignored: ["**/.wwebjs_auth/**", "**/node_modules/**"],
-      };
     }
     return config;
   },
