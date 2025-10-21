@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } } // ← Ubah dari cameraId ke id
+  { params }: { params: Promise<{ id: string }> } // ← Ubah jadi Promise
 ) {
   try {
-    const cameraId = params.id; // ← Ambil dari params.id
+    const { id: cameraId } = await params; // ← Await params dulu
 
     console.log(`🔍 [API LOGS] Fetching logs for cameraId: "${cameraId}"`);
     console.log(`🔍 [API LOGS] Request URL: ${req.url}`);
@@ -22,7 +22,7 @@ export async function GET(
     // Query dengan explicit filter
     const logs = await prisma.cameraLog.findMany({
       where: {
-        cameraId: cameraId, // Gunakan variable yang sudah di-extract
+        cameraId: cameraId,
       },
       orderBy: { createdAt: "desc" },
       take: 50,
