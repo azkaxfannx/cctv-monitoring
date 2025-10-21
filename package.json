@@ -6,7 +6,7 @@
     "dev": "concurrently \"node server.js\" \"pnpm run dev:wa\"",
     "dev:wa": "npx tsx wa-worker.ts",
     "dev1": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "NODE_ENV=production node server.js",
     "start1": "next start"
   },
