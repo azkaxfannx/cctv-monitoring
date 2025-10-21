@@ -7,7 +7,7 @@
     "dev:wa": "npx tsx wa-worker.ts",
     "dev1": "next dev --turbopack",
     "build": "next build",
-    "start": "NODE_ENV=production && node server.js",
+    "start": "set NODE_ENV=production && node server.js",
     "start1": "next start"
   },
   "dependencies": {
