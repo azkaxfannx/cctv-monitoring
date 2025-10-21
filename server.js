@@ -2,8 +2,9 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 const { Server } = require("socket.io");
+require("dotenv").config();
 
-const dev = process.env.NODE_ENV !== "production";
+const dev = false;
 // const hostname = "localhost";
 const hostname = "0.0.0.0";
 const port = 3000;
